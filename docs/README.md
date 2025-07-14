@@ -1,8 +1,8 @@
 # Conformal Floating Feature Selection
 
-**Authors:** [Farnoosh Abbas-Aghababazadeh](https://github.com/RibaA), Kewei Ni
+**Authors:** [Farnoosh Abbas-Aghababazadeh](https://github.com/RibaA), [Kewei Ni](https://github.com/Nicole9801), Ruben Armañanzas Arnedillo
 
-**Contact:** [bhklab.farnooshabbas-aghababazadeh@gmail.com](mailto:bhklab.farnooshabbas-aghababazadeh@gmail.com)
+**Contact:** [farnoosh.abbasaghababazadeh@uhn.ca](mailto:farnoosh.abbasaghababazadeh@uhn.ca), [kewei.ni@uhn.ca](mailto:kewei.ni@uhn.ca), [rarmananzas@unav.es](rarmananzas@unav.es)
 
 **Description:** Feature selection to find an optimal subset of features 
 
