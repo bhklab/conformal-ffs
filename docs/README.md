@@ -4,7 +4,7 @@
 
 **Contact:** [farnoosh.abbasaghababazadeh@uhn.ca](mailto:farnoosh.abbasaghababazadeh@uhn.ca), [kewei.ni@uhn.ca](mailto:kewei.ni@uhn.ca), [rarmananzas@unav.es](rarmananzas@unav.es)
 
-**Description:** Feature selection to find an optimal subset of features 
+**Description:** Conformal prediction–driven feature selection for accurate, interpretable models, with applications in immuno-oncology datasets.
 
 --------------------------------------
 
