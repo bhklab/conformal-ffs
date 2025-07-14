@@ -1,8 +1,8 @@
 # Conformal Floating Feature Selection
 
-**Authors:** [Farnoosh Abbas-Aghababazadeh](https://github.com/RibaA), [Kewei Ni](https://github.com/Nicole9801), Ruben Armañanzas Arnedillo
+**Authors:** [Farnoosh Abbas-Aghababazadeh](https://github.com/RibaA), [Kewei Ni](https://github.com/Nicole9801), [Marcos López De Castro](https://github.com/MarcosLDC), [Ruben Armañanzas Arnedillo](https://github.com/rarmananzas)
 
-**Contact:** [farnoosh.abbasaghababazadeh@uhn.ca](mailto:farnoosh.abbasaghababazadeh@uhn.ca), [kewei.ni@uhn.ca](mailto:kewei.ni@uhn.ca), [rarmananzas@unav.es](rarmananzas@unav.es)
+**Contact:** [farnoosh.abbasaghababazadeh@uhn.ca](mailto:farnoosh.abbasaghababazadeh@uhn.ca), [kewei.ni@uhn.ca](mailto:kewei.ni@uhn.ca), [mlopezdecas@unav.es](mailto:mlopezdecas@unav.es), [rarmananzas@unav.es](rarmananzas@unav.es)
 
 **Description:** Conformal prediction–driven feature selection for accurate, interpretable models, with applications in immuno-oncology datasets.
 
