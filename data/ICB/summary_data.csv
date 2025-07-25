@@ -1,0 +1,22 @@
+File,Cancer_Type,Treatment,RNA,Total_Patients,Survival_Time_PFS,Event_Occurred_PFS,Recist_PD,Recist_PR,Recist_CR,Recist_PD*,Recist_SD,Recist_Only scanned baseline,Recist_PD ,Recist_Only scanned at baseline,Recist_mixed,Response_NR,Response_R
+ICB_Jung_filtered.rds,Lung,PD-1/PD-L1,tpm,27,['Yes'],['Yes'],,,,,,,,,,19,8
+ICB_Hugo_filtered.rds,Melanoma,PD-1/PD-L1,fpkm,27,['No'],['No'],13.0,10.0,4.0,,,,,,,13,14
+ICB_Roh_filtered.RData,Melanoma,CTLA4,,16,['No'],['No'],11.0,4.0,,1.0,,,,,,11,4
+ICB_Nathanson_filtered.RData,Melanoma,CTLA4,fpkm,24,['No'],['No'],,,,,,,,,,14,10
+ICB_Braun_filtered.RData,Kidney,PD-1/PD-L1,tpm,181,['Yes'],['Yes'],69.0,38.0,1.0,,64.0,,,,,103,39
+ICB_Jerby_Arnon_filtered.RData,Melanoma,PD-1/PD-L1,tpm,112,['No' 'Yes'],['No' 'Yes'],49.0,25.0,14.0,,15.0,,,,,53,43
+ICB_Riaz_filtered.rds,Melanoma,"Combo, PD-1/PD-L1",tpm,46,['No'],['No'],21.0,6.0,3.0,,14.0,,,,,21,9
+ICB_Miao1_filtered.RData,Kidney,PD-1/PD-L1,tpm,33,['Yes'],['Yes'],16.0,7.0,1.0,,9.0,,,,,18,10
+ICB_Snyder_filtered.RData,Ureteral,PD-1/PD-L1,tpm,25,['Yes'],['Yes'],7.0,2.0,5.0,,5.0,3.0,2.0,1.0,,10,8
+ICB_Limagne1_filtered.rds,Lung,anti-PD-1,tpm,70,['Yes'],['Yes'],,,,,,,,,,52,17
+ICB_VanDenEnde_filtered.RData,Esophageal,PD-1/PD-L1,tpm,35,['No'],['No'],,,,,,,,,,20,12
+ICB_Padron_filtered.RData,Pancreas,PD-1/PD-L1,tpm,45,['Yes'],['Yes'],,,,,,,,,,20,3
+ICB_Shiuan_filtered.RData,Kidney,PD-1/PD-L1,tpm,15,['No'],['No'],7.0,6.0,,,,,,,2.0,7,6
+ICB_Limagne2_filtered.rds,Lung,anti-PD-1/anti-PD-L1,tpm,26,['Yes'],['Yes'],,,,,,,,,,16,6
+ICB_Van_Allen_filtered.RData,Melanoma,CTLA4,tpm,42,['Yes'],['Yes'],27.0,5.0,2.0,,7.0,,,,,30,9
+ICB_Mariathasan_filtered.RData,"Ureteral, Bladder, Kidney, Lung, Liver, Unknown, Lymph_node",PD-1/PD-L1,tpm,348,['No'],['No'],167.0,43.0,25.0,,63.0,,,,,167,68
+ICB_Gide_filtered.rds,Melanoma,PD-1/PD-L1,tpm,41,['Yes'],['Yes'],16.0,15.0,4.0,,6.0,,,,,19,19
+ICB_Liu_filtered.RData,Melanoma,"Combo, PD-1/PD-L1",fpkm,121,['Yes'],['Yes'],56.0,31.0,16.0,,18.0,,,,,60,52
+ICB_Kim_filtered.rds,Gastric,PD-1/PD-L1,fpkm,45,['No'],['No'],18.0,,13.0,,14.0,,,,,18,13
+ICB_Hwang_filtered.RData,Lung,PD-1/PD-L1,tpm,21,['Yes'],['Yes'],,,,,,,,,,13,3
+ICB_Puch_filtered.RData,Melanoma,PD-1/PD-L1,tpm,55,['No'],['No'],35.0,,14.0,,6.0,,,,,35,14
