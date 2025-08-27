@@ -2,10 +2,10 @@ import pyreadr
 import os
 import pandas as pd
 
-ICB_dir = "data/procdata/ICB/"
+ICB_dir = "data/ICB/"
 
 # View one ICB data
-ICB_Liu = "data/procdata/ICB/ICB_Liu_filtered.RData"
+ICB_Liu = "data/ICB/ICB_Liu_filtered.RData"
 output = pyreadr.read_r(ICB_Liu)
     # each file contains two dataframes: clinical and expr with matched patient IDs
 clinical_df = output.get('clinical', None)
@@ -59,4 +59,7 @@ summary_df = pd.DataFrame(summary_data)
 summary_df = summary_df.join(summary_df.pop('Recist_Counts').apply(pd.Series).add_prefix('Recist_'))
 summary_df = summary_df.join(summary_df.pop('Response_Counts').apply(pd.Series).add_prefix('Response_'))
 
-summary_df
+
+
+
+print(summary_df)

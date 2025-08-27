@@ -29,6 +29,8 @@ ipython = "*"
 ipykernel = "*"
 jupyterlab = "*"
 pip = "*"
+scikit-learn = ">=1.7.1,<2"
+numba = ">=0.61.2,<0.62"
 
 [pypi-dependencies]
 damply = ">=0.10.0, <0.11"
