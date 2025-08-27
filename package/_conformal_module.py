@@ -1,11 +1,6 @@
 """
 Optimized Conformal Prediction module
 
-Performance improvements:
-- Vectorized operations for p-value computations
-- Efficient array operations
-- Reduced memory allocations
-- JIT compilation for critical sections
 """
 
 import os

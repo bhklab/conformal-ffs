@@ -4,9 +4,7 @@ Utility functions for mRMR-MS (minimum Redundancy Maximum Relevance - Multi-clas
 This module provides utility functions for the mRMR-MS feature selection algorithm
 with standardized naming conventions and improved performance.
 
-Authors: Marcos López De Castro 
-         Alberto García Galindo
-         Rubén Armañanzas
+
 """
 
 import numpy as np

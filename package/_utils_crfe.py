@@ -1,16 +1,6 @@
 """
-Optimized auxiliary functions for CRFE.
-
 This module provides utility functions for the Conformal Recursive Feature Elimination
 algorithm with standardized naming conventions and performance improvements.
-
-Performance improvements:
-- Vectorized operations using NumPy
-- Efficient array operations
-- Reduced function call overhead
-- Better memory management
-- JIT compilation for critical functions
-- Consistent parameter naming
 """
 
 import numpy as np

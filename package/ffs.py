@@ -6,9 +6,6 @@ This module provides the main entry point for running feature selection experime
 using CRFE (Conformal Recursive Feature Elimination) and mRMR methods with
 standardized naming conventions and improved performance.
 
-Authors: Marcos López De Castro 
-         Alberto García Galindo
-         Rubén Armañanzas
 """
 
 import numpy as np

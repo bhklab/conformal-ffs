@@ -1,20 +1,9 @@
 """
-Optimized Conformal Recursive Feature Elimination for feature selection.
+
 
 This module implements an efficient version of Conformal Recursive Feature Elimination
 (CRFE) with standardized notation and optimized performance.
 
-Performance improvements:
-- Vectorized operations where possible
-- Reduced memory allocations
-- Cached computations
-- Efficient NumPy operations
-- Minimal object copying
-- Consistent naming conventions
-
-Authors: Marcos López De Castro 
-         Alberto García Galindo
-         Rubén Armañanzas
 """
 
 import numpy as np
