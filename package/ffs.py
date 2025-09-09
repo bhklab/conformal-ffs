@@ -209,10 +209,14 @@ def run_mrmr_experiment(estimator, X_train: np.ndarray, y_train: np.ndarray,
             raise ValueError("Need at least 2 classes for classification")
         
         # Create mRMR feature selector
+        # Disable parallel processing on Windows to avoid multiprocessing issues
+        import platform
+        use_parallel = True if platform.system() != "Windows" else False
+        
         mrmr = FeatureSelector(
             classes_=[i for i in range(n_classes)],
             max_features=len(selected_features)+1, 
-            parallel=True,
+            parallel=use_parallel,
             verbose=True
         )
         
