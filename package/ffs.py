@@ -264,7 +264,7 @@ class FloatingFeatureSelector:
     
     def __init__(self, run_id: int = 1, data_path: str = "synthetic", 
                  test_size: float = 0.15, cal_size: float = 0.5,
-                 estimator=None):
+                 estimator=None, max_patience: int = 5):
         """
         Initialize the Floating Feature Selector.
         
@@ -280,11 +280,15 @@ class FloatingFeatureSelector:
             Proportion of remaining data to use for calibration
         estimator : sklearn estimator, optional
             Base estimator for feature selection. If None, creates LinearSVC
+        max_patience : int, default=5
+            Maximum number of consecutive iterations without improvement before stopping
+            to avoid local minima
         """
         self.run_id = run_id
         self.data_path = data_path
         self.test_size = test_size
         self.cal_size = cal_size
+        self.max_patience = max_patience
         self.estimator = estimator or create_linear_svc_estimator()
         self.data_reader = DataReader()
         
@@ -304,12 +308,18 @@ class FloatingFeatureSelector:
         
         # Floating Feature Selection specific attributes
         self.S = None  # Selected features set
+        self.U_start = None  
         self.U = None  # Available features set
         self.best_metric = None
         self.best_subset = None
         self.new_scores = None
         self.new_subsets = None  # Store corresponding subsets for new_scores
         self.counter = 0
+        
+        # Patience mechanism for avoiding local minima
+        self.patience_counter = 0  # Track consecutive iterations without improvement
+        self.global_best_metric = None  # Track absolute best metric seen
+        self.global_best_subset = None  # Track absolute best subset seen
         
         # Conformal prediction metrics
         self.Empirical_coverage_ = None
@@ -327,6 +337,8 @@ class FloatingFeatureSelector:
         Tuple[np.ndarray, np.ndarray, np.ndarray]
             Features, labels, and class names
         """
+
+
         self.X, self.y, self.class_names = self.data_reader.load_data(self.data_path)
         
         print(f"Dataset loaded: {self.X.shape} samples, {len(self.class_names)} classes: {self.class_names}")
@@ -334,6 +346,7 @@ class FloatingFeatureSelector:
         
         return self.X, self.y, self.class_names
     
+
     def split_data(self) -> Tuple[np.ndarray, ...]:
         """
         Split loaded data into training, calibration, and test sets.
@@ -371,46 +384,51 @@ class FloatingFeatureSelector:
         
         if self.S is None:
             
-            S = set(np.random.choice(
-                self.X_train.shape[1], 
-                size=int(self.X_train.shape[1] * 0.15), 
-                replace=False
-            ))
+            S = set() #set(np.random.choice(self.X_train.shape[1], size=int(self.X_train.shape[1] * 0.15), replace=False))
+            U_start = set()
+
 
             all_features = set(range(self.X_train.shape[1]))
             U = all_features - S  # Complementary set
 
             self.S = np.array(sorted(S), dtype=int)
+            self.U_start = np.array(sorted(U_start), dtype=int)
             self.U = np.array(sorted(U), dtype=int)
 
 
         print(f"Initial S (selected): {self.S} ")
         print(f"Initial U (unselected): {self.U} ")
+        print(f"Initial U_start: {self.U_start} \n")
 
 
         return None
     
 
 
-    def update(self):
-        """Update best metric and subset if current performance is better."""
-        if self.best_metric is None:
-            self.best_metric = self.Uncertainty_
-            self.best_subset = self.S.copy()
-            return None
+    def update(self, update_flag=True):
 
-        # Check if any of the new scores is better than current best
-        if hasattr(self, 'new_scores') and self.new_scores is not None:
-            counter = 0
-            for ele in self.new_scores:
-                if ele < self.best_metric:
-                    self.best_metric = ele
-                    if hasattr(self, 'new_subsets') and self.new_subsets is not None:
-                        self.best_subset = self.new_subsets[counter].copy()
-                    return counter             
-                
-                else:
-                    counter += 1
+        if update_flag == True:
+            """Update best metric and subset if current performance is better."""
+            if self.best_metric is None:
+                self.best_metric = self.Uncertainty_
+                self.best_subset = self.S.copy()
+                return None
+
+            # Check if any of the new scores is better than current best
+            if hasattr(self, 'new_scores') and self.new_scores is not None:
+                counter = 0
+                for ele in self.new_scores:
+                    if ele < self.best_metric:
+                        self.best_metric = ele
+                        if hasattr(self, 'new_subsets') and self.new_subsets is not None:
+                            self.best_subset = self.new_subsets[counter].copy()
+                        return counter             
+                    
+                    else:
+                        counter += 1
+        else:
+            self.best_metric = np.inf
+            return None
 
         return None
     
@@ -418,29 +436,74 @@ class FloatingFeatureSelector:
 
 
     def init_method(self):
+
         """Initialize the floating feature selection method."""
         
         self.init_S_U()  # random init if not initialized
 
         # Calculate initial scores using the utility function
 
-        X_train_init = self.X_train[:,  self.S]
-        X_cal_init = self.X_cal[:,  self.S]  
-        X_test_init = self.X_test[:, self.S]
+        if self.S is None or len(self.S) == 0:
 
-        scores = predict_scores_svm(
-            self.estimator, self.classes_, self.lambda_param, self.lambda_p_param,
-            X_train_init, self.y_train, X_cal_init, self.y_cal, X_test_init, self.y_test
-        )
+            self.Empirical_coverage_ = 0.0
+            self.Uncertainty_ = np.inf
+            self.Certainty_ = 0.0
 
-        self.Empirical_coverage_ = scores[0]
-        self.Uncertainty_ = scores[1]
-        self.Certainty_ = scores[2]
+        else:
+
+            X_train_init = self.X_train[:,  self.S]
+            X_cal_init = self.X_cal[:,  self.S]  
+            X_test_init = self.X_test[:, self.S]
+
+            scores = predict_scores_svm(
+                self.estimator, self.classes_, self.lambda_param, self.lambda_p_param,
+                X_train_init, self.y_train, X_cal_init, self.y_cal, X_test_init, self.y_test
+            )
+
+            self.Empirical_coverage_ = scores[0]
+            self.Uncertainty_ = scores[1]
+            self.Certainty_ = scores[2]
+
+        print(f"Initial scores with features {self.S}:")
+        print(f"  Empirical Coverage: {self.Empirical_coverage_:.4f}")
+        print(f"  Uncertainty: {self.Uncertainty_:.4f}")
+        print(f"  Certainty: {self.Certainty_:.4f}")
 
         self.update()
 
+    
         return None
     
+
+
+    def run_crfe_experiment_U(self) -> Dict[str, Any]:
+        """
+        Run CRFE (Conformal Recursive Feature Elimination) experiment.
+        
+        """
+
+        if self.X_train is None:
+            raise ValueError("Data must be split before running experiments. Call split_data() first.")
+            
+        print("Running CRFE experiment...")
+        sys.stdout.flush()
+
+
+        X_train_U = self.X_train[:, self.U].copy()
+        X_cal_U = self.X_cal[:, self.U].copy()
+        X_test_U = self.X_test[:, self.U].copy()
+
+
+        removed_feature = run_crfe_experiment(
+            self.estimator, X_train_U, self.y_train, 
+            X_cal_U, self.y_cal, X_test_U, self.y_test
+        )
+        
+
+        f_removed_feature = self.U[removed_feature]
+        print("Removed feature: ", f_removed_feature)
+        
+        return f_removed_feature
     
     def run_crfe_experiment(self) -> Dict[str, Any]:
         """
@@ -479,19 +542,12 @@ class FloatingFeatureSelector:
         
         return f_removed_feature
     
+    
+    
     def run_mrmr_experiment(self) -> Dict[str, Any]:
         """
         Run mRMR-MS (minimum Redundancy Maximum Relevance - Multi-class SVM) experiment.
         
-        Returns
-        -------
-        Dict[str, Any]
-            mRMR experiment results
-            
-        Raises
-        ------
-        ValueError
-            If data has not been split yet
         """
         if self.X_train is None:
             raise ValueError("Data must be split before running experiments. Call split_data() first.")
@@ -510,7 +566,6 @@ class FloatingFeatureSelector:
         
         f_added_feature = [S[-1]]
         print(f"Added feature: {f_added_feature}")
-
 
         
         return f_added_feature
@@ -536,50 +591,51 @@ class FloatingFeatureSelector:
         # 1. Removal move: S_minus = S \ {f_removed}       
         S_minus = np.setdiff1d(current_S, f_removed)
 
-        
+    
         # Extract training, calibration, and test data for removal move
         X_train_minus = self.X_train[:, S_minus]
         X_cal_minus = self.X_cal[:, S_minus]  
         X_test_minus = self.X_test[:, S_minus]
-        
+    
         # Compute scores for removal move
         scores_minus = predict_scores_svm(
             self.estimator, self.classes_, self.lambda_param, self.lambda_p_param,
             X_train_minus, self.y_train, X_cal_minus, self.y_cal, X_test_minus, self.y_test
         )
+
         metric_minus = scores_minus[1]  # Using Uncertainty as the metric
-        
+    
         # 2. Addition move: S_plus = S ∪ {f_added}  
         S_plus = np.append(current_S, f_added)
-        
+    
         # Extract training, calibration, and test data for addition move
         X_train_plus = self.X_train[:, S_plus]
         X_cal_plus = self.X_cal[:, S_plus]
         X_test_plus = self.X_test[:, S_plus]
-        
+    
         # Compute scores for addition move
         scores_plus = predict_scores_svm(
             self.estimator, self.classes_, self.lambda_param, self.lambda_p_param,
             X_train_plus, self.y_train, X_cal_plus, self.y_cal, X_test_plus, self.y_test
         )
         metric_plus = scores_plus[1]  # Using Uncertainty as the metric
-        
+    
         # 3. Swap move: S_swap = (S \ {f_removed}) ∪ {f_added}
         S_swap = np.setdiff1d(current_S, f_removed)
         S_swap = np.append(S_swap, f_added)
-        
+    
         # Extract training, calibration, and test data for swap move  
         X_train_swap = self.X_train[:, S_swap]
         X_cal_swap = self.X_cal[:, S_swap]
         X_test_swap = self.X_test[:, S_swap]
-        
+    
         # Compute scores for swap move
         scores_swap = predict_scores_svm(
             self.estimator, self.classes_, self.lambda_param, self.lambda_p_param,
             X_train_swap, self.y_train, X_cal_swap, self.y_cal, X_test_swap, self.y_test
         )
         metric_swap = scores_swap[1]  # Using Uncertainty as the metric
-        
+    
         # Store results
         move_results = {
             'removal': {
@@ -598,7 +654,10 @@ class FloatingFeatureSelector:
                 'scores': scores_swap
             }
         }
-        
+
+
+    
+    
         print(f"Move evaluation results:")
         print(f"  Current best metric: {self.best_metric:.4f}")
         print(f"  Removal move metric: {metric_minus:.4f}")
@@ -622,6 +681,15 @@ class FloatingFeatureSelector:
             print(f"  ✓ Improvement found! Best move: {best_move_name}")
             print(f"  ✓ New best metric: {self.best_metric:.4f}")
             
+            # Reset patience counter on improvement
+            self.patience_counter = 0
+            
+            # Update global best if this is the best we've seen
+            if self.global_best_metric is None or self.best_metric < self.global_best_metric:
+                self.global_best_metric = self.best_metric
+                self.global_best_subset = best_move_subset.copy()
+                print(f"  ✓ New global best metric: {self.global_best_metric:.4f}")
+            
             # Update current feature sets
             self.S = best_move_subset.copy()
             all_features = set(range(self.X_train.shape[1]))
@@ -632,49 +700,99 @@ class FloatingFeatureSelector:
             self.Uncertainty_ = best_move_scores[1] 
             self.Certainty_ = best_move_scores[2]
             
-            
-            
-            # Add improvement info to results
-            #move_results['improvement'] = True
-            #move_results['best_move'] = best_move_name
-            #move_results['improvement_index'] = improvement_index
-            
             return move_results
         
-
         else:
-            print(f"  ✗ No improvement found. Keeping current subset.\n")
-            move_results['improvement'] = False
-            move_results['best_move'] = None
-            return None  # Signal to stop the FFS loop
-    
-        
+            # No immediate improvement found
+            self.patience_counter += 1
+            print(f"  ✗ No improvement found. Patience: {self.patience_counter}/{self.max_patience}")
+            
+            if self.patience_counter >= self.max_patience:
+                print(f"  ✗ Patience exhausted ({self.max_patience} iterations without improvement).")
+                if self.global_best_subset is not None:
+                    print(f"  → Reverting to global best subset with metric: {self.global_best_metric:.4f}")
+                    # Revert to global best
+                    self.S = self.global_best_subset.copy()
+                    self.best_metric = self.global_best_metric
+                    all_features = set(range(self.X_train.shape[1]))
+                    self.U = np.array(sorted(all_features - set(self.S)), dtype=int)
+                print(f"  → Stopping FFS due to exhausted patience.\n")
+                move_results['improvement'] = False
+                move_results['best_move'] = None
+                move_results['patience_exhausted'] = True
+                return None  # Signal to stop the FFS loop
+            else:
+                print(f"  → Continuing search (patience remaining: {self.max_patience - self.patience_counter}).\n")
+                move_results['improvement'] = False
+                move_results['best_move'] = None
+                move_results['patience_exhausted'] = False
+                return move_results  # Continue searching despite no improvement
+            
+
         
     
     def _run_ffs(self):
 
-        # Run experiments
-        for i in range(10):  # Limit to 10 iterations for safety
+
+        while len(self.S) < int(0.08 * len(self.U)):
+
+            f_added = self.run_mrmr_experiment()  
+
+            self.S = np.append(self.S.copy(), f_added).copy()
+            self.U = np.setdiff1d(self.U.copy(), f_added).copy()
+
+            f_removed = self.run_crfe_experiment_U()  
+
+            self.U_start = np.append(self.U_start.copy(), f_removed).copy()
+            self.U = np.setdiff1d(self.U.copy(), f_removed).copy()
+
+            print("\n#######\n")
+            print("Current features selected: ", self.S)
+            print("Current features unselected: ", self.U )
+            print("Current features removed: ", self.U_start, "\n")
+            print("\n#######\n")
+
+        print("\nStarting Floating Feature Selection iterations...\n")
+
+        merged_array = np.concatenate((self.U, self.U_start))
+        self.U = np.unique(merged_array).copy()
+        
+        # Initialize global best metrics at the start of FFS iterations
+        if self.global_best_metric is None:
+            self.global_best_metric = self.best_metric
+            self.global_best_subset = self.S.copy()
+            print(f"Initialized global best metric: {self.global_best_metric:.4f}")
+
+        # Run experiments with patience mechanism
+        max_iterations = 50  # Increased to allow for patience exploration
+        for i in range(max_iterations):
+
             f_removed = self.run_crfe_experiment()  #self.f_removed
             f_added = self.run_mrmr_experiment()  #self.f_added
 
             ret = self._evaluate_moves(f_removed, f_added)
+            print(f"Iteration {i+1} completed.")
             print("Current features selected: ", self.S, "\n")
+
+            # Check stopping conditions
             if ret is None:
+                # Either improvement found or patience exhausted
+                if hasattr(ret, 'get') and ret.get('patience_exhausted', False):
+                    print("Stopping due to exhausted patience.")
+                else:
+                    print("Stopping due to other termination condition.")
                 break
             
+        print(f"FFS completed after {i+1} iterations.")
+        if self.global_best_subset is not None:
+            print(f"Final global best metric: {self.global_best_metric:.4f}")
+            print(f"Final feature subset: {self.global_best_subset}")
+        
         return None
         
     
     def run_ffs(self) -> Dict[str, Any]:
         """
-        Run feature selection experiments in sequence.
-        
-        This method handles the complete pipeline:
-        1. Load data
-        2. Split data
-        3. Run CRFE experiment
-        4. Run mRMR experiment
         
         Returns
         -------
