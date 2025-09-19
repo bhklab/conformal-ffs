@@ -418,7 +418,7 @@ class FloatingFeatureSelector:
             if hasattr(self, 'new_scores') and self.new_scores is not None:
                 counter = 0
                 for ele in self.new_scores:
-                    if ele < self.best_metric:
+                    if ele <= self.best_metric:
                         self.best_metric = ele
                         if hasattr(self, 'new_subsets') and self.new_subsets is not None:
                             self.best_subset = self.new_subsets[counter].copy()
@@ -685,7 +685,7 @@ class FloatingFeatureSelector:
             self.patience_counter = 0
             
             # Update global best if this is the best we've seen
-            if self.global_best_metric is None or self.best_metric < self.global_best_metric:
+            if self.global_best_metric is None or self.best_metric <= self.global_best_metric:
                 self.global_best_metric = self.best_metric
                 self.global_best_subset = best_move_subset.copy()
                 print(f"  ✓ New global best metric: {self.global_best_metric:.4f}")
