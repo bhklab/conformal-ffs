@@ -218,23 +218,29 @@ class DataReader:
             self.n_classes = len(class_names)
             self.n_samples = X.shape[0]
             self.n_features = X.shape[1]
-
+ 
         else:
             # Load from file
-            main_path = os.path.dirname(os.path.abspath(__file__))
-            full_data_path = os.path.join(main_path, "DATA", data_path)
+            
+            full_data_path =  data_path
 
             print(f"Loading data from: {full_data_path}")
              
             # Efficient CSV reading with appropriate dtypes
             try:
-                X = pd.read_csv(
-                    os.path.join(full_data_path, "X.csv"), 
-                    dtype=np.float32  # Use float32 for memory efficiency
-                ).values
-                y = pd.read_csv(
-                    os.path.join(full_data_path, "y.csv")  # Standardized filename
-                ).values.ravel()  # Flatten immediately
+                df = pd.read_csv(full_data_path, header=0)
+                df = df.dropna(subset=['recist'])
+                print("We consider the first column as labels and the rest as features!!!!")
+                X = df.iloc[:, 2:].values
+                y = df.iloc[:, 1].values 
+
+                # Create a mapping from unique response labels to integers
+                unique_labels = pd.Series(y).dropna().unique()
+                label_map = {label: idx for idx, label in enumerate(unique_labels)}
+                print(f"Label mapping: {label_map}")
+                # Map the response labels in y to integers using label_map
+                y = pd.Series(y).map(label_map).values
+                
             except FileNotFoundError as e:
                 raise FileNotFoundError(f"Data files not found in {full_data_path}: {e}")
 

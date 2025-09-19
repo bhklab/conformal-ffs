@@ -17,7 +17,11 @@ import ffs
 
 # Configuration
 run_id = 0              # Fixed seed for reproducibility
-data_path = "synthetic"  # Use an internal synthetic dataset (for development purposes)
+
+
+#data_path = "synthetic"  # Use an internal synthetic dataset (for development purposes)
+data_path = "data/melanoma_batch_corrected_data_common_genes_cosmic_io.csv"
+
 
 # Run the experiment    
 ffs_instance = ffs.FloatingFeatureSelector(run_id=run_id, data_path=data_path)
