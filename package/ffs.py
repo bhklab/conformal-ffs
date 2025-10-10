@@ -136,7 +136,8 @@ def split_dataset(X: np.ndarray, y: np.ndarray, run_id: int,
 
 def run_crfe_experiment(estimator, X_train: np.ndarray, y_train: np.ndarray, 
                        X_cal: np.ndarray, y_cal: np.ndarray, 
-                       X_test: np.ndarray, y_test: np.ndarray) -> Dict[str, Any]:
+                       X_test: np.ndarray, y_test: np.ndarray,
+                       perc_features_to_remove = 1) -> Dict[str, Any]:
     
     """
     Run CRFE experiment with the given data splits.
@@ -148,15 +149,24 @@ def run_crfe_experiment(estimator, X_train: np.ndarray, y_train: np.ndarray,
     X_train, y_train : Training data and labels
     X_cal, y_cal : Calibration data and labels
     X_test, y_test : Test data and labels
+    perc_features_to_remove : float, default=0 Percentage of features to remove. If 0, removes 1 feature.
     
     Returns
     -------
     Dict[str, Any]
         Results dictionary or error information
     """
+
+    
+    
     
     n_features = X_train.shape[1]
     feature_indices = np.arange(n_features)
+
+    if isinstance(perc_features_to_remove, float):
+        n_features_to_remove = int(n_features * perc_features_to_remove)
+    else:
+        n_features_to_remove = perc_features_to_remove
     
     if n_features <= 1:
         raise ValueError("Need at least 2 features for feature selection")
@@ -164,7 +174,7 @@ def run_crfe_experiment(estimator, X_train: np.ndarray, y_train: np.ndarray,
     # Create CRFE with standardized parameters
     crfe = CRFE(
         estimator=estimator, 
-        n_features_to_select=n_features - 1, 
+        n_features_to_select=n_features - n_features_to_remove, 
         lambda_param=0.5,  # Default value
         epsilon=0.4        # Default value
     )
@@ -174,13 +184,18 @@ def run_crfe_experiment(estimator, X_train: np.ndarray, y_train: np.ndarray,
 
     list_of_selected_features = crfe.results_dict_
 
+    
+    if len(list_of_selected_features) > 1:
+        list_of_selected_features = np.array(list_of_selected_features[-1])
+    
+
     removed_features = np.setdiff1d(feature_indices, list_of_selected_features)
 
     return removed_features
 
 
 
-def run_mrmr_experiment(estimator, X_train: np.ndarray, y_train: np.ndarray, 
+def run_mrmr_experiment_(estimator, X_train: np.ndarray, y_train: np.ndarray, 
                        X_cal: np.ndarray, y_cal: np.ndarray, 
                        X_test: np.ndarray, y_test: np.ndarray,
                        selected_features) -> Dict[str, Any]:
@@ -222,10 +237,11 @@ def run_mrmr_experiment(estimator, X_train: np.ndarray, y_train: np.ndarray,
         
         # mRMR-MS parameters
         kernel = "linear"     # Options: "linear", "rbf", "poly"
-        split_size = 0.5      # Split size for mRMR-MS
+        split_size = 0.5      # Split size for mRMR-MS if applied
         
         # Run mRMR-MS feature selection
-        mrmr.mRMR_MS(X_train, y_train, kernel, split_size,  selected_features)
+        #mrmr.mRMR_MS(X_train, y_train, kernel, split_size,  selected_features)
+        mrmr.JMI(X_train, y_train,  selected_features)
 
         return mrmr.all_selected_features[-1] if hasattr(mrmr, 'all_selected_features') else {}
     
@@ -264,7 +280,7 @@ class FloatingFeatureSelector:
     
     def __init__(self, run_id: int = 1, data_path: str = "synthetic", 
                  test_size: float = 0.15, cal_size: float = 0.5,
-                 estimator=None, max_patience: int = 5):
+                 estimator=None, max_patience: int = 2):
         """
         Initialize the Floating Feature Selector.
         
@@ -418,7 +434,7 @@ class FloatingFeatureSelector:
             if hasattr(self, 'new_scores') and self.new_scores is not None:
                 counter = 0
                 for ele in self.new_scores:
-                    if ele <= self.best_metric:
+                    if ele < self.best_metric:
                         self.best_metric = ele
                         if hasattr(self, 'new_subsets') and self.new_subsets is not None:
                             self.best_subset = self.new_subsets[counter].copy()
@@ -476,7 +492,7 @@ class FloatingFeatureSelector:
     
 
 
-    def run_crfe_experiment_U(self) -> Dict[str, Any]:
+    def run_crfe_experiment_U(self, per_feat_remove=0.1) -> Dict[str, Any]:
         """
         Run CRFE (Conformal Recursive Feature Elimination) experiment.
         
@@ -496,7 +512,8 @@ class FloatingFeatureSelector:
 
         removed_feature = run_crfe_experiment(
             self.estimator, X_train_U, self.y_train, 
-            X_cal_U, self.y_cal, X_test_U, self.y_test
+            X_cal_U, self.y_cal, X_test_U, self.y_test,
+            perc_features_to_remove=per_feat_remove
         )
         
 
@@ -505,7 +522,7 @@ class FloatingFeatureSelector:
         
         return f_removed_feature
     
-    def run_crfe_experiment(self) -> Dict[str, Any]:
+    def run_crfe_experiment(self, per_feat_remove = 1) -> Dict[str, Any]:
         """
         Run CRFE (Conformal Recursive Feature Elimination) experiment.
         
@@ -533,7 +550,8 @@ class FloatingFeatureSelector:
 
         removed_feature = run_crfe_experiment(
             self.estimator, X_train_S, self.y_train, 
-            X_cal_S, self.y_cal, X_test_S, self.y_test
+            X_cal_S, self.y_cal, X_test_S, self.y_test,
+            perc_features_to_remove=per_feat_remove
         )
         
 
@@ -544,27 +562,27 @@ class FloatingFeatureSelector:
     
     
     
-    def run_mrmr_experiment(self) -> Dict[str, Any]:
+    def run_mrmr_experiment(self, per_feat_add =  1 ) -> Dict[str, Any]:
         """
-        Run mRMR-MS (minimum Redundancy Maximum Relevance - Multi-class SVM) experiment.
+        Run CMI (minimum Redundancy Maximum Relevance - Multi-class SVM) experiment.
         
         """
         if self.X_train is None:
             raise ValueError("Data must be split before running experiments. Call split_data() first.")
             
-        print("Running mRMR experiment...")
+        print("Running JMI experiment...")
         sys.stdout.flush()
 
         X_train_U = self.X_train.copy()
         X_cal_U = self.X_cal.copy()
         X_test_U = self.X_test.copy()
         
-        S = run_mrmr_experiment(
+        S = run_mrmr_experiment_(
             self.estimator, X_train_U, self.y_train, 
-            X_cal_U, self.y_cal, X_test_U, self.y_test, self.S
-        )
+            X_cal_U, self.y_cal, X_test_U, self.y_test, self.S)
         
-        f_added_feature = [S[-1]]
+        f_added_feature = S[-per_feat_add]
+
         print(f"Added feature: {f_added_feature}")
 
         
@@ -577,9 +595,9 @@ class FloatingFeatureSelector:
         Parameters
         ----------
         f_removed : int
-            Feature to be removed from current subset S
+            Feature index to be removed from current subset S
         f_added : int  
-            Feature to be added to current subset S
+            Feature index to be added to current subset S
             
         Returns
         -------
@@ -587,6 +605,7 @@ class FloatingFeatureSelector:
             Dictionary containing metrics for each move type
         """
         current_S = self.S.copy()
+        
         
         # 1. Removal move: S_minus = S \ {f_removed}       
         S_minus = np.setdiff1d(current_S, f_removed)
@@ -678,8 +697,8 @@ class FloatingFeatureSelector:
             best_move_subset = self.new_subsets[improvement_index]
             best_move_scores = [scores_minus, scores_plus, scores_swap][improvement_index]
             
-            print(f"  ✓ Improvement found! Best move: {best_move_name}")
-            print(f"  ✓ New best metric: {self.best_metric:.4f}")
+            print(f"  Improvement found! Best move: {best_move_name}")
+            print(f"  New best metric: {self.best_metric:.4f}")
             
             # Reset patience counter on improvement
             self.patience_counter = 0
@@ -688,7 +707,7 @@ class FloatingFeatureSelector:
             if self.global_best_metric is None or self.best_metric <= self.global_best_metric:
                 self.global_best_metric = self.best_metric
                 self.global_best_subset = best_move_subset.copy()
-                print(f"  ✓ New global best metric: {self.global_best_metric:.4f}")
+                print(f"  New global best metric: {self.global_best_metric:.4f}")
             
             # Update current feature sets
             self.S = best_move_subset.copy()
@@ -705,10 +724,10 @@ class FloatingFeatureSelector:
         else:
             # No immediate improvement found
             self.patience_counter += 1
-            print(f"  ✗ No improvement found. Patience: {self.patience_counter}/{self.max_patience}")
+            print(f"  No improvement found. Patience: {self.patience_counter}/{self.max_patience}")
             
             if self.patience_counter >= self.max_patience:
-                print(f"  ✗ Patience exhausted ({self.max_patience} iterations without improvement).")
+                print(f"  Patience exhausted ({self.max_patience} iterations without improvement).")
                 if self.global_best_subset is not None:
                     print(f"  → Reverting to global best subset with metric: {self.global_best_metric:.4f}")
                     # Revert to global best
@@ -728,20 +747,25 @@ class FloatingFeatureSelector:
                 move_results['patience_exhausted'] = False
                 return move_results  # Continue searching despite no improvement
             
-
-        
     
-    def _run_ffs(self):
+    def _run_ffs(self,n_feat = 0.1):
 
+        if n_feat is None:
+            print("n_feat not specified, defaulting to 10% of total features.")
+            n_feat = int(0.1 * len(self.U))
+        if isinstance(n_feat, float):
+            n_feat = int(n_feat * len(self.U))
+        else:
+            n_feat = n_feat
 
-        while len(self.S) < int(0.08 * len(self.U)):
+        while len(self.S) < n_feat:
 
             f_added = self.run_mrmr_experiment()  
 
             self.S = np.append(self.S.copy(), f_added).copy()
             self.U = np.setdiff1d(self.U.copy(), f_added).copy()
 
-            f_removed = self.run_crfe_experiment_U()  
+            f_removed = self.run_crfe_experiment_U(per_feat_remove=0.1)  
 
             self.U_start = np.append(self.U_start.copy(), f_removed).copy()
             self.U = np.setdiff1d(self.U.copy(), f_removed).copy()
@@ -766,9 +790,14 @@ class FloatingFeatureSelector:
         # Run experiments with patience mechanism
         max_iterations = 50  # Increased to allow for patience exploration
         for i in range(max_iterations):
+            
+            if self.patience_counter > 0:
+                n_feat_to_eval = self.patience_counter + 1
+            else:
+                n_feat_to_eval = 1
 
-            f_removed = self.run_crfe_experiment()  #self.f_removed
-            f_added = self.run_mrmr_experiment()  #self.f_added
+            f_removed = self.run_crfe_experiment(per_feat_remove=n_feat_to_eval)  #self.f_removed
+            f_added = self.run_mrmr_experiment(per_feat_add=n_feat_to_eval)  #self.f_added
 
             ret = self._evaluate_moves(f_removed, f_added)
             print(f"Iteration {i+1} completed.")
@@ -776,11 +805,10 @@ class FloatingFeatureSelector:
 
             # Check stopping conditions
             if ret is None:
-                # Either improvement found or patience exhausted
-                if hasattr(ret, 'get') and ret.get('patience_exhausted', False):
-                    print("Stopping due to exhausted patience.")
-                else:
-                    print("Stopping due to other termination condition.")
+                print("Stopping due to termination condition.")
+                break
+            elif isinstance(ret, dict) and ret.get('patience_exhausted', False):
+                print("Stopping due to exhausted patience.")
                 break
             
         print(f"FFS completed after {i+1} iterations.")
@@ -788,16 +816,19 @@ class FloatingFeatureSelector:
             print(f"Final global best metric: {self.global_best_metric:.4f}")
             print(f"Final feature subset: {self.global_best_subset}")
         
-        return None
+        return self.global_best_subset
         
     
-    def run_ffs(self) -> Dict[str, Any]:
+    def run_ffs(self, n_feat = None) -> Dict[str, Any]:
         """
         
         Returns
         -------
         Dict[str, Any]
             Combined results from all experiments
+        
+        n_feat : int or float, optional
+            Number or proportion of features to select. If float, treated as proportion.
         """
         # Load and prepare data
         self.load_data()
@@ -808,10 +839,10 @@ class FloatingFeatureSelector:
         self.init_method()
 
         # Run your floating feature selection algorithm
-        ffs_results = self._run_ffs()
+        ffs_results = self._run_ffs(n_feat=n_feat)
         
         
-        return None
+        return ffs_results
     
 
 

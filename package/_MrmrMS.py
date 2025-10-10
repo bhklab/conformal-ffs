@@ -364,13 +364,13 @@ class FeatureSelector:
         
     
 
-    def mRMR(self, X_tr,Y_tr)-> None:
+    def mRMR(self, X_tr,Y_tr, selected_features:list = [])-> None:
 
         dataset: np.ndarray = np.hstack((X_tr, Y_tr.reshape(-1,1)))  # The class column must be the last one always.
 
         objeto_numpy = numpy_InformationTheoryFS(dataset.copy(), self.parallel)
 
-        objeto_numpy.dataset_selected_features = []
+        objeto_numpy.dataset_selected_features = selected_features
 
 
         if self.max_features == -1:
@@ -401,13 +401,13 @@ class FeatureSelector:
         
     
 
-    def JMI(self, X_tr,Y_tr)-> None:
+    def JMI(self, X_tr,Y_tr, selected_features:list = [])-> None:
 
         dataset: np.ndarray = np.hstack((X_tr, Y_tr.reshape(-1,1)))  # The class column must be the last one always.
 
         objeto_numpy = numpy_InformationTheoryFS(dataset.copy(), self.parallel)
 
-        objeto_numpy.dataset_selected_features = []
+        objeto_numpy.dataset_selected_features = selected_features
 
         if self.max_features == -1:
             self.max_features = len(X_tr[0])
@@ -436,13 +436,13 @@ class FeatureSelector:
 
         
 
-    def relax_mRMR(self, X_tr,Y_tr)-> None:
+    def relax_mRMR(self, X_tr,Y_tr, selected_features:list = [])-> None:
 
         dataset: np.ndarray  = np.hstack((X_tr, Y_tr.reshape(-1,1)))  # The class column must be the last one always.
 
         objeto_numpy = numpy_InformationTheoryFS(dataset.copy(), self.parallel)
 
-        objeto_numpy.dataset_selected_features = []
+        objeto_numpy.dataset_selected_features = selected_features
         
 
         if self.max_features == -1:
