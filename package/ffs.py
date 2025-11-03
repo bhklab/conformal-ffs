@@ -215,7 +215,7 @@ def run_mrmr_experiment_(estimator, X_train: np.ndarray, y_train: np.ndarray,
     Dict[str, Any]
         Results dictionary or error information
     """
-    selected_features = selected_features.tolist()
+    
 
     try:
         n_classes = len(np.unique(y_train))
@@ -278,9 +278,13 @@ class FloatingFeatureSelector:
         Storage for experiment results
     """
     
-    def __init__(self, run_id: int = 1, data_path: str = "synthetic", 
-                 test_size: float = 0.15, cal_size: float = 0.5,
-                 estimator=None, max_patience: int = 2):
+    def __init__(self, run_id: int = 1, 
+                 data_path: str = "synthetic", 
+                 target_column: str = "target",
+                 test_size: float = 0.15, 
+                 cal_size: float = 0.5,
+                 estimator=None,
+                max_patience: int = 2):
         """
         Initialize the Floating Feature Selector.
         
@@ -302,6 +306,7 @@ class FloatingFeatureSelector:
         """
         self.run_id = run_id
         self.data_path = data_path
+        self.target_column = target_column
         self.test_size = test_size
         self.cal_size = cal_size
         self.max_patience = max_patience
@@ -355,7 +360,7 @@ class FloatingFeatureSelector:
         """
 
 
-        self.X, self.y, self.class_names = self.data_reader.load_data(self.data_path)
+        self.X, self.y, self.class_names = self.data_reader.load_data(self.data_path, self.target_column)
         
         print(f"Dataset loaded: {self.X.shape} samples, {len(self.class_names)} classes: {self.class_names}")
         sys.stdout.flush()
@@ -522,6 +527,8 @@ class FloatingFeatureSelector:
         
         return f_removed_feature
     
+
+    
     def run_crfe_experiment(self, per_feat_remove = 1) -> Dict[str, Any]:
         """
         Run CRFE (Conformal Recursive Feature Elimination) experiment.
@@ -572,22 +579,35 @@ class FloatingFeatureSelector:
             
         print("Running JMI experiment...")
         sys.stdout.flush()
+        S_U = np.sort(self.U.tolist() + self.S.tolist())
+        encoder = {col: idx for idx, col in enumerate(S_U)}
+        #decoder = {idx: col for idx, col in enumerate(S_U)}
+        encoded_S = [encoder[col] for col in self.S]
 
-        X_train_U = self.X_train.copy()
-        X_cal_U = self.X_cal.copy()
-        X_test_U = self.X_test.copy()
-        
+        X_train_U = self.X_train[:, S_U].copy()
+        X_cal_U = self.X_cal[:, S_U].copy()
+        X_test_U = self.X_test[:, S_U].copy()
+        #print(S_U)
+
         S = run_mrmr_experiment_(
             self.estimator, X_train_U, self.y_train, 
-            X_cal_U, self.y_cal, X_test_U, self.y_test, self.S)
+            X_cal_U, self.y_cal, X_test_U, self.y_test, encoded_S)
         
-        f_added_feature = S[-per_feat_add]
+        #new_features = [f for f in S if f not in self.S]
+        new_features = [f for f in S]
+        f_added_feature = new_features[-per_feat_add] if len(new_features) >= per_feat_add else new_features[-1]
 
-        print(f"Added feature: {f_added_feature}")
+        #f_added_feature_ = decoder[f_added_feature]
+        f_added_feature_ = S_U[f_added_feature]
+        #f_added_feature = S[-per_feat_add]
+
+        print(f"\nAdded feature: {f_added_feature_}")
 
         
-        return f_added_feature
+        return f_added_feature_
     
+
+
     def _evaluate_moves(self, f_removed, f_added):
         """
         Evaluate three potential moves: removal, addition, and swap.
@@ -766,7 +786,7 @@ class FloatingFeatureSelector:
             self.U = np.setdiff1d(self.U.copy(), f_added).copy()
 
             f_removed = self.run_crfe_experiment_U(per_feat_remove=0.1)  
-
+  
             self.U_start = np.append(self.U_start.copy(), f_removed).copy()
             self.U = np.setdiff1d(self.U.copy(), f_removed).copy()
 
@@ -853,9 +873,9 @@ if __name__ == "__main__":
     run_id = 1              # Fixed seed for reproducibility
     data_path = "synthetic"  # Use synthetic dataset
 
-
+    target_column = "target"  # Specify the target column for real datasets
         
-    ffs = FloatingFeatureSelector(run_id=run_id, data_path=data_path)
+    ffs = FloatingFeatureSelector(run_id=run_id, data_path=data_path, target_column=target_column)
     results = ffs.run_ffs()
 
 

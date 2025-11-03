@@ -179,7 +179,7 @@ class DataReader:
         self.n_samples = None
         self.n_features = None
 
-    def load_data(self, data_path: str) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def load_data(self, data_path: str, target_column: str) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Load data with optimized I/O operations.
         
@@ -220,19 +220,28 @@ class DataReader:
             self.n_features = X.shape[1]
  
         else:
+
             # Load from file
-            
             full_data_path =  data_path
 
             print(f"Loading data from: {full_data_path}")
              
             # Efficient CSV reading with appropriate dtypes
             try:
-                df = pd.read_csv(full_data_path, header=0)
-                df = df.dropna(subset=['recist'])
+                if target_column == "recist":
+                    df = pd.read_csv(full_data_path, header=0, index_col = 0)
+                else:
+                    df = pd.read_csv(full_data_path, header=0)
+                
+                df = df.dropna(subset=[target_column])
+
                 print("We consider the first column as labels and the rest as features!!!!")
-                X = df.iloc[:, 2:].values
-                y = df.iloc[:, 1].values 
+                
+                y = df[target_column].values
+                X = df.drop(columns=[target_column]).values
+                
+                #X = df.iloc[:, 2:].values
+                #y = df.iloc[:, 1].values 
 
                 # Create a mapping from unique response labels to integers
                 unique_labels = pd.Series(y).dropna().unique()
