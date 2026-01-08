@@ -382,3 +382,13 @@ site/
 # models/
 # sandbox/
 # etc.
+
+
+data/
+docs/data_sources.md
+docs/usage.md
+docs/devnotes.md
+
+workflow/scripts/example_script_1.py
+workflow/scripts/example_script_2.py
+workflow/scripts/ICB_Inspect.py
