@@ -1,10 +1,10 @@
-# Conformal Floating Feature Selection
+# Bidirectional Floating Feature Selection Guided by Uncertainty Quantification
 
-**Authors:** [Farnoosh Abbas-Aghababazadeh](https://github.com/RibaA), [Kewei Ni](https://github.com/Nicole9801), [Marcos López De Castro](https://github.com/MarcosLDC), [Ruben Armañanzas Arnedillo](https://github.com/rarmananzas)
+**Authors:**  [Marcos López De Castro](https://github.com/MarcosLDC), [Farnoosh Abbas-Aghababazadeh](https://github.com/RibaA), [Kewei Ni](https://github.com/Nicole9801), [Ruben Armañanzas Arnedillo](https://github.com/rarmananzas)
 
-**Contact:** [farnoosh.abbasaghababazadeh@uhn.ca](mailto:farnoosh.abbasaghababazadeh@uhn.ca), [kewei.ni@uhn.ca](mailto:kewei.ni@uhn.ca), [mlopezdecas@unav.es](mailto:mlopezdecas@unav.es), [rarmananzas@unav.es](rarmananzas@unav.es)
+**Contact:** [mlopezdecas@unav.es](mailto:mlopezdecas@unav.es), [farnoosh.abbasaghababazadeh@uhn.ca](mailto:farnoosh.abbasaghababazadeh@uhn.ca), [kewei.ni@uhn.ca](mailto:kewei.ni@uhn.ca), [rarmananzas@unav.es](rarmananzas@unav.es)
 
-**Description:** Conformal prediction–driven feature selection for accurate, interpretable models, with applications in immuno-oncology datasets.
+**Description:** Conformal prediction–driven feature selection, with applications in immuno-oncology datasets. We propose a novel bidirectional floating algorithm for feature selection named Conformal Bidirectional Floating Search Algorithm (CBFS), in which the feature search is enhanced by information from the conformal prediction framework.
 
 --------------------------------------
 
@@ -35,6 +35,7 @@ If you haven't installed it yet, [follow these instructions](https://pixi.sh/lat
 pixi install
 ```
 
-## Documentation
+<!-- ## Documentation
 
-Click [here](https://bhklab.github.io/conformal-ffs) to view the full documentation.
+Click [here](https://bhklab.github.io/conformal-ffs) to view the full documentation. --> 
+
