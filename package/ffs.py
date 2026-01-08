@@ -24,7 +24,7 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.multiclass import OneVsRestClassifier
 from sklearn.calibration import CalibratedClassifierCV
 
-from _utils_crfe import DataReader
+from _utils_crfe import DataReader, h5adDataReader
 from _crfe import CRFE
 from _MrmrMS import FeatureSelector
 from _utils import predict_scores_svm
@@ -35,6 +35,10 @@ from _utils import predict_scores_svm
 def _get_random_state(seed: int) -> np.random.Generator:
     """Cached random state generator to avoid recreation."""
     return np.random.default_rng(seed)
+
+def calculate_decay_factor(k, U0_initial):
+    x = (k/U0_initial)**(1/k)
+    return x
 
 
 def generate_random_integer(seed: int) -> int:
@@ -198,7 +202,7 @@ def run_crfe_experiment(estimator, X_train: np.ndarray, y_train: np.ndarray,
 def run_mrmr_experiment_(estimator, X_train: np.ndarray, y_train: np.ndarray, 
                        X_cal: np.ndarray, y_cal: np.ndarray, 
                        X_test: np.ndarray, y_test: np.ndarray,
-                       selected_features) -> Dict[str, Any]:
+                       selected_features, per_feat_add: int = 1) -> Dict[str, Any]:
     """
     Run mRMR-MS experiment with the given data splits.
     
@@ -215,7 +219,10 @@ def run_mrmr_experiment_(estimator, X_train: np.ndarray, y_train: np.ndarray,
     Dict[str, Any]
         Results dictionary or error information
     """
-    
+    try: 
+        selected_features = selected_features.tolist()
+    except:
+        pass
 
     try:
         n_classes = len(np.unique(y_train))
@@ -228,9 +235,9 @@ def run_mrmr_experiment_(estimator, X_train: np.ndarray, y_train: np.ndarray,
         import platform
         use_parallel = True if platform.system() != "Windows" else False
         
-        mrmr = FeatureSelector(
+        FFS = FeatureSelector(
             classes_=[i for i in range(n_classes)],
-            max_features=len(selected_features)+1, 
+            max_features=len(selected_features)+per_feat_add, 
             parallel=use_parallel,
             verbose=True
         )
@@ -241,9 +248,9 @@ def run_mrmr_experiment_(estimator, X_train: np.ndarray, y_train: np.ndarray,
         
         # Run mRMR-MS feature selection
         #mrmr.mRMR_MS(X_train, y_train, kernel, split_size,  selected_features)
-        mrmr.JMI(X_train, y_train,  selected_features)
+        FFS.JMI(X_train, y_train,  selected_features)
 
-        return mrmr.all_selected_features[-1] if hasattr(mrmr, 'all_selected_features') else {}
+        return FFS.all_selected_features[-1] if hasattr(FFS, 'all_selected_features') else {}
     
     except Exception as e:
         print(f"Error in mRMR experiment: {str(e)}")
@@ -278,13 +285,10 @@ class FloatingFeatureSelector:
         Storage for experiment results
     """
     
-    def __init__(self, run_id: int = 1, 
-                 data_path: str = "synthetic", 
-                 target_column: str = "target",
-                 test_size: float = 0.15, 
-                 cal_size: float = 0.5,
-                 estimator=None,
-                max_patience: int = 2):
+    def __init__(self, run_id: int = 1, data_path: str = "synthetic", 
+                 test_size: float = 0.15, cal_size: float = 0.5,
+                 estimator=None, max_patience: int = 3, 
+                 target_column: Optional[str] = None):
         """
         Initialize the Floating Feature Selector.
         
@@ -306,12 +310,12 @@ class FloatingFeatureSelector:
         """
         self.run_id = run_id
         self.data_path = data_path
-        self.target_column = target_column
         self.test_size = test_size
         self.cal_size = cal_size
         self.max_patience = max_patience
         self.estimator = estimator or create_linear_svc_estimator()
         self.data_reader = DataReader()
+        self.target_column = target_column
         
         # Initialize storage for experiment components
         self.X = None
@@ -341,6 +345,9 @@ class FloatingFeatureSelector:
         self.patience_counter = 0  # Track consecutive iterations without improvement
         self.global_best_metric = None  # Track absolute best metric seen
         self.global_best_subset = None  # Track absolute best subset seen
+        self.improvement_tol = 1e-8  # tolerancia para empates numéricos
+        self.max_restarts = 1        # reinicios permitidos al agotar paciencia
+        self.restart_counter = 0
         
         # Conformal prediction metrics
         self.Empirical_coverage_ = None
@@ -350,22 +357,32 @@ class FloatingFeatureSelector:
         self.experiment_results = {}
         
     def load_data(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """
-        Load data using the configured data reader.
-        
-        Returns
-        -------
-        Tuple[np.ndarray, np.ndarray, np.ndarray]
-            Features, labels, and class names
-        """
 
 
-        self.X, self.y, self.class_names = self.data_reader.load_data(self.data_path, self.target_column)
+        if "h5ad" in self.data_path:
+            data_reader = h5adDataReader(test_size=0.20,cal_size=0.30, random_state=self.run_id, var_keep_top=3500)
+            splits, class_names = data_reader.load_data(self.data_path, self.target_column)
+
+            self.X_train, self.X_cal, self.X_test, self.y_train, self.y_cal, self.y_test = splits
+
+            print(f"Train shape: {self.X_train.shape}, Cal shape: {self.X_cal.shape}, Test shape: {self.X_test.shape}")
+            # Set classes and calculate lambda_p_param
+            self.classes_ = np.unique(self.y_train)
+            if len(self.classes_) > 2:
+                self.lambda_p_param = (1 - self.lambda_param) / (len(self.classes_) - 1)
+            else:
+                self.lambda_p_param = 0.0
+
+        else:
+
+            self.X, self.y, self.class_names = self.data_reader.load_data(self.data_path)
         
-        print(f"Dataset loaded: {self.X.shape} samples, {len(self.class_names)} classes: {self.class_names}")
-        sys.stdout.flush()
+            print(f"Dataset loaded: {self.X.shape} samples, {len(self.class_names)} classes: {self.class_names}")
+            sys.stdout.flush()
+
+            self.split_data()
         
-        return self.X, self.y, self.class_names
+        return None
     
 
     def split_data(self) -> Tuple[np.ndarray, ...]:
@@ -401,25 +418,25 @@ class FloatingFeatureSelector:
         return splits
     
     def init_S_U(self):
+
         """Initialize the selected (S) and unselected (U) feature sets."""
-        
         if self.S is None:
             
             S = set() #set(np.random.choice(self.X_train.shape[1], size=int(self.X_train.shape[1] * 0.15), replace=False))
             U_start = set()
 
 
-            all_features = set(range(self.X_train.shape[1]))
+            all_features = set(range(self.X_train.shape[1])) #idx of all features
             U = all_features - S  # Complementary set
 
-            self.S = np.array(sorted(S), dtype=int)
-            self.U_start = np.array(sorted(U_start), dtype=int)
-            self.U = np.array(sorted(U), dtype=int)
+            self.S = np.array(sorted(S), dtype=int)                # selected features
+            self.U_start = np.array(sorted(U_start), dtype=int)    # removed features
+            self.U = np.array(sorted(U), dtype=int)                # unselected features      
 
 
-        print(f"Initial S (selected): {self.S} ")
-        print(f"Initial U (unselected): {self.U} ")
-        print(f"Initial U_start: {self.U_start} \n")
+        print(f"Initial S (selected): {len(self.S)} ")
+        print(f"Initial U (unselected): {len(self.U)} ")
+        print(f"Initial U_start (removed): {len(self.U_start)} \n")
 
 
         return None
@@ -427,31 +444,41 @@ class FloatingFeatureSelector:
 
 
     def update(self, update_flag=True):
-
-        if update_flag == True:
-            """Update best metric and subset if current performance is better."""
-            if self.best_metric is None:
-                self.best_metric = self.Uncertainty_
-                self.best_subset = self.S.copy()
-                return None
-
-            # Check if any of the new scores is better than current best
-            if hasattr(self, 'new_scores') and self.new_scores is not None:
-                counter = 0
-                for ele in self.new_scores:
-                    if ele < self.best_metric:
-                        self.best_metric = ele
-                        if hasattr(self, 'new_subsets') and self.new_subsets is not None:
-                            self.best_subset = self.new_subsets[counter].copy()
-                        return counter             
-                    
-                    else:
-                        counter += 1
-        else:
+        if not update_flag:
             self.best_metric = np.inf
+            self.best_subset = None
             return None
 
-        return None
+        # Handle initialization
+        if self.best_metric is None:
+            self.best_metric = self.Uncertainty_
+            self.best_subset = self.S.copy()
+            return None
+
+        # Logic to find the BEST improvement in the current batch
+        if hasattr(self, 'new_scores') and self.new_scores is not None:
+            # Find the index of the absolute best score in this batch
+            best_in_batch_idx = np.argmin(self.new_scores)
+            best_in_batch_val = self.new_scores[best_in_batch_idx]
+
+            # Compare the best of the batch against the global best
+            is_improvement = best_in_batch_val < (self.best_metric - self.improvement_tol)
+            is_tie_but_new = (
+                abs(best_in_batch_val - self.best_metric) <= self.improvement_tol
+                and hasattr(self, 'new_subsets') and self.new_subsets is not None
+                and self.best_subset is not None
+                and not np.array_equal(self.new_subsets[best_in_batch_idx], self.best_subset)
+            )
+
+            if is_improvement or is_tie_but_new:
+                self.best_metric = best_in_batch_val
+
+                # Ensure subset is updated in sync
+                if hasattr(self, 'new_subsets') and self.new_subsets is not None:
+                    self.best_subset = self.new_subsets[best_in_batch_idx].copy()
+
+                return best_in_batch_idx
+
     
 
 
@@ -463,7 +490,6 @@ class FloatingFeatureSelector:
         self.init_S_U()  # random init if not initialized
 
         # Calculate initial scores using the utility function
-
         if self.S is None or len(self.S) == 0:
 
             self.Empirical_coverage_ = 0.0
@@ -527,8 +553,6 @@ class FloatingFeatureSelector:
         
         return f_removed_feature
     
-
-    
     def run_crfe_experiment(self, per_feat_remove = 1) -> Dict[str, Any]:
         """
         Run CRFE (Conformal Recursive Feature Elimination) experiment.
@@ -579,35 +603,32 @@ class FloatingFeatureSelector:
             
         print("Running JMI experiment...")
         sys.stdout.flush()
+
+        #X_train_U = self.X_train.copy()
+        #X_cal_U = self.X_cal.copy()
+        #X_test_U = self.X_test.copy()
         S_U = np.sort(self.U.tolist() + self.S.tolist())
         encoder = {col: idx for idx, col in enumerate(S_U)}
-        #decoder = {idx: col for idx, col in enumerate(S_U)}
         encoded_S = [encoder[col] for col in self.S]
 
         X_train_U = self.X_train[:, S_U].copy()
         X_cal_U = self.X_cal[:, S_U].copy()
         X_test_U = self.X_test[:, S_U].copy()
-        #print(S_U)
 
         S = run_mrmr_experiment_(
             self.estimator, X_train_U, self.y_train, 
-            X_cal_U, self.y_cal, X_test_U, self.y_test, encoded_S)
+            X_cal_U, self.y_cal, X_test_U, self.y_test, encoded_S, per_feat_add=per_feat_add)
         
-        #new_features = [f for f in S if f not in self.S]
-        new_features = [f for f in S]
-        f_added_feature = new_features[-per_feat_add] if len(new_features) >= per_feat_add else new_features[-1]
-
-        #f_added_feature_ = decoder[f_added_feature]
-        f_added_feature_ = S_U[f_added_feature]
         #f_added_feature = S[-per_feat_add]
+        #print(f"Added feature: {f_added_feature}")
 
-        print(f"\nAdded feature: {f_added_feature_}")
-
+        S = list(S)
+        new_features = S[-per_feat_add:] if len(S) >= per_feat_add else S
+        f_added_features = np.array([S_U[f] for f in new_features])
+        print(f"\nAdded features: {f_added_features}")
         
-        return f_added_feature_
+        return f_added_features
     
-
-
     def _evaluate_moves(self, f_removed, f_added):
         """
         Evaluate three potential moves: removal, addition, and swap.
@@ -747,6 +768,7 @@ class FloatingFeatureSelector:
             print(f"  No improvement found. Patience: {self.patience_counter}/{self.max_patience}")
             
             if self.patience_counter >= self.max_patience:
+
                 print(f"  Patience exhausted ({self.max_patience} iterations without improvement).")
                 if self.global_best_subset is not None:
                     print(f"  → Reverting to global best subset with metric: {self.global_best_metric:.4f}")
@@ -755,6 +777,16 @@ class FloatingFeatureSelector:
                     self.best_metric = self.global_best_metric
                     all_features = set(range(self.X_train.shape[1]))
                     self.U = np.array(sorted(all_features - set(self.S)), dtype=int)
+
+                if self.global_best_subset is not None and self.restart_counter < self.max_restarts:
+                    self.restart_counter += 1
+                    self.patience_counter = 0
+                    print(f"  → Restarting from global best (restart {self.restart_counter}/{self.max_restarts}).")
+                    move_results['improvement'] = False
+                    move_results['best_move'] = None
+                    move_results['patience_exhausted'] = False
+                    return move_results  # continue loop
+
                 print(f"  → Stopping FFS due to exhausted patience.\n")
                 move_results['improvement'] = False
                 move_results['best_move'] = None
@@ -771,13 +803,18 @@ class FloatingFeatureSelector:
     def _run_ffs(self,n_feat = 0.1):
 
         if n_feat is None:
-            print("n_feat not specified, defaulting to 10% of total features.")
+            print("n_feat not specified, defaulting to 10% of total unselected features.")
             n_feat = int(0.1 * len(self.U))
         if isinstance(n_feat, float):
             n_feat = int(n_feat * len(self.U))
         else:
             n_feat = n_feat
-
+        
+        decay = calculate_decay_factor(n_feat , len(self.U))  # compute decay factor for CRFE
+        print(f"Target number of features to select: {n_feat}")
+        print(f"Decay factor for CRFE: {decay:.4f}\n")
+        n_feat_to_rem = len(self.U)
+        
         while len(self.S) < n_feat:
 
             f_added = self.run_mrmr_experiment()  
@@ -785,15 +822,17 @@ class FloatingFeatureSelector:
             self.S = np.append(self.S.copy(), f_added).copy()
             self.U = np.setdiff1d(self.U.copy(), f_added).copy()
 
-            f_removed = self.run_crfe_experiment_U(per_feat_remove=0.1)  
-  
+            n_feat_to_rem = int(n_feat_to_rem * decay )
+            f_removed = self.run_crfe_experiment_U(per_feat_remove=len(self.U) - n_feat_to_rem) 
+             
+
             self.U_start = np.append(self.U_start.copy(), f_removed).copy()
             self.U = np.setdiff1d(self.U.copy(), f_removed).copy()
 
             print("\n#######\n")
-            print("Current features selected: ", self.S)
-            print("Current features unselected: ", self.U )
-            print("Current features removed: ", self.U_start, "\n")
+            print("Current features selected: ",len(self.S))
+            print("Current features unselected: ",len(self.U))
+            print("Current features removed: ",len(self.U_start), "\n")
             print("\n#######\n")
 
         print("\nStarting Floating Feature Selection iterations...\n")
@@ -808,11 +847,20 @@ class FloatingFeatureSelector:
             print(f"Initialized global best metric: {self.global_best_metric:.4f}")
 
         # Run experiments with patience mechanism
-        max_iterations = 50  # Increased to allow for patience exploration
+        max_iterations = 20  # Increased to allow for patience exploration
         for i in range(max_iterations):
             
             if self.patience_counter > 0:
-                n_feat_to_eval = self.patience_counter + 1
+                max_move = min(len(self.S), len(self.U))
+                if max_move == 0:
+                    print("No moves possible (S or U empty). Stopping.")
+                    break
+                
+                if self.patience_counter >= self.max_patience:
+                    print("Maximum patience reached, stopping FFS.")
+                    break
+                #n_feat_to_eval = self.patience_counter + 1
+                n_feat_to_eval = min(self.patience_counter + 1, max_move)
             else:
                 n_feat_to_eval = 1
 
@@ -839,6 +887,7 @@ class FloatingFeatureSelector:
         return self.global_best_subset
         
     
+
     def run_ffs(self, n_feat = None) -> Dict[str, Any]:
         """
         
@@ -852,10 +901,6 @@ class FloatingFeatureSelector:
         """
         # Load and prepare data
         self.load_data()
-        self.split_data()
-    
-
-        # Initialize the floating feature selection method
         self.init_method()
 
         # Run your floating feature selection algorithm
@@ -873,9 +918,9 @@ if __name__ == "__main__":
     run_id = 1              # Fixed seed for reproducibility
     data_path = "synthetic"  # Use synthetic dataset
 
-    target_column = "target"  # Specify the target column for real datasets
+
         
-    ffs = FloatingFeatureSelector(run_id=run_id, data_path=data_path, target_column=target_column)
+    ffs = FloatingFeatureSelector(run_id=run_id, data_path=data_path)
     results = ffs.run_ffs()
 
 

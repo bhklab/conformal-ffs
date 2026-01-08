@@ -34,6 +34,9 @@ def predict_scores_svm(estimator_, classes_, lambda_param, lambda_p_param,
     #X_test_view = X_test[1:]
 
     # Initialize lambda_p_param if not provided
+    print(classes_)
+    print(len(classes_))
+    print(lambda_param)
     if lambda_p_param is None:
         lambda_p_param = (1 - lambda_param) / (len(classes_) - 1) if len(classes_) > 2 else 0
 
@@ -83,5 +86,6 @@ def predict_scores_svm(estimator_, classes_, lambda_param, lambda_p_param,
     empirical_coverage = scores[0]
     uncertainty = scores[1]
     certainty = scores[2]
+    print(f"Empirical coverage: {empirical_coverage}, Uncertainty: {uncertainty}, Certainty: {certainty}")
 
     return [empirical_coverage, uncertainty, certainty]

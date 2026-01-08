@@ -211,7 +211,6 @@ class numpy_InformationTheoryFS:
         return np.mean([self.cmi([ele], [column], [], 3) for ele in self.dataset_selected_features])
 
     
-
     def cond_redundancy_func(self, column): 
         return np.mean([self.cmi([ele], [column], [self.class_column_index], 3) for ele in self.dataset_selected_features])
 
@@ -238,11 +237,19 @@ class numpy_InformationTheoryFS:
 
     def process_column_JMI(self, column):
         relevance = self.relevance_func(column)
+        if not self.dataset_selected_features:
+            return relevance
+        
         redundancy = self.redundancy_func(column)
         cond_redundancy = self.cond_redundancy_func(column)
 
         return relevance - redundancy + cond_redundancy
-    
+
+
+        # The classic approach:
+        #cond_sum = sum(self.cmi([column], [s], [self.class_column_index], 3)
+        #           for s in self.dataset_selected_features)
+        #return relevance + cond_sum
 
     def process_column_relax_mRMR(self, column):
         relevance = self.relevance_func(column)

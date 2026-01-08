@@ -19,6 +19,7 @@ from sklearn.base import BaseEstimator, clone
 from sklearn.multiclass import OneVsRestClassifier
 from sklearn.calibration import CalibratedClassifierCV
 from _utils_crfe import binary_change, NC_OvsA_SVMl_dev
+from _conformal_module import CP
 
 
 
@@ -188,7 +189,7 @@ class CRFE(BaseEstimator):
 
         if len(self.classes_) == 2:
             # Binary classification
-            estimator = self.estimator_.fit(X_train_data, y_train)
+            estimator = self.estimator.fit(X_train_data, y_train)
             weights = estimator.coef_
             bias = estimator.intercept_
 
@@ -230,8 +231,8 @@ class CRFE(BaseEstimator):
                         multiclass) for sample in X_test_data]
 
         # Conformal prediction scores (currently disabled)
-        # scores = CP(0.10).Conformal_prediction_scores(y_test, ncm_test, ncm_cal, self.classes_)
-        # print("Scores: ", scores[0], scores[1], scores[2])
+        scores = CP(0.10).Conformal_prediction_scores(y_test, ncm_test, ncm_cal, self.classes_)
+        print("Scores: ", scores[0], scores[1], scores[2])
         sys.stdout.flush()
         
         return None  # scores
@@ -272,6 +273,7 @@ class CRFE(BaseEstimator):
         n_current_features = n_features
 
         # Main elimination loop
+        #print(f"Starting recursive feature elimination from {n_current_features} features to {self.n_features_to_select} features.")
         while n_current_features != self.n_features_to_select:
             current_indices = X_train_work[0].astype(int)
             
@@ -289,7 +291,7 @@ class CRFE(BaseEstimator):
                 weights = model.coef_
                 
                 # Use optimized beta computation
-                beta = _compute_beta_binary_optimized(weights, y_cal, X_cal_data)
+                beta = _compute_beta_binary_optimized(weights, y_train, X_train_data)
             else:
                 # Multiclass classification
                 if isinstance(model, OneVsRestClassifier):
@@ -302,16 +304,23 @@ class CRFE(BaseEstimator):
                 weights = np.array([est.coef_[0] for est in model.estimators_])
                 
                 # Use optimized beta computation
-                beta = _compute_beta_multiclass_optimized(weights, y_cal, X_cal_data, 
+                beta = _compute_beta_multiclass_optimized(weights, y_train, X_train_data, 
                                                         self.lambda_param, self.lambda_p_param_)
 
+
+            feat_for_rem = int(n_current_features - self.n_features_to_select)
+
+            features_to_eliminate = np.argsort(beta)[-feat_for_rem:]
+            #features_to_eliminate  = np.sort(features_to_eliminate ) # this does not seem necessary
+
             # Find feature to eliminate (feature with maximum beta)
-            feature_to_eliminate = np.argmax(beta)
+            #feature_to_eliminate = np.argmax(beta)
             
             # Efficient column deletion using boolean indexing
             keep_mask = np.ones(n_current_features, dtype=bool)
-            keep_mask[feature_to_eliminate] = False
-            
+            keep_mask[features_to_eliminate] = False
+            #print(f"Eliminating features: {current_indices[features_to_eliminate].astype(int)}")
+
             # Update working arrays
             X_train_work = X_train_work[:, keep_mask]
             X_cal_work = X_cal_work[:, keep_mask]
@@ -331,7 +340,7 @@ class CRFE(BaseEstimator):
             elimination_results["Index"].append(current_indices[keep_mask].astype(int))
 
             # Calculate conformal prediction scores (currently disabled)
-            # scores = self._predict_scores_svm(X_train_work, y_train, X_cal_work, y_cal, X_test_work, y_test)
+            #self._predict_scores_svm(X_train_work, y_train, X_cal_work, y_cal, X_test_work, y_test)
             # for i, name in enumerate(results_keys[1:]):
             #     elimination_results[name].append(scores[i])
         
@@ -340,7 +349,7 @@ class CRFE(BaseEstimator):
         
         # Store beta values for selected features (excluding the last eliminated feature)
         if "beta" in locals():
-            final_beta = np.delete(beta, feature_to_eliminate)
+            final_beta = np.delete(beta, features_to_eliminate)
             self.feature_betas_ = final_beta.tolist()
         else:
             self.feature_betas_ = []
