@@ -408,3 +408,7 @@ build/
 *.egg-info/
 
 src/__pycache__
+
+dist/
+src/*.egg-info
+

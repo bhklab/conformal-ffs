@@ -2,8 +2,8 @@ import sys
 import numpy as np
 import pandas as pd
 from sklearn.multiclass import OneVsRestClassifier
-from _utils_crfe import binary_change, NC_OvsA_SVMl_dev
-from _conformal_module import CP
+from ._utils_crfe import binary_change, NC_OvsA_SVMl_dev
+from ._conformal_module import CP
 
 def predict_scores_svm(estimator_, classes_, lambda_param, lambda_p_param,
                       X_tr, Y_tr, X_cal, Y_cal, X_test, Y_test):

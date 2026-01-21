@@ -18,8 +18,8 @@ from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
 from sklearn.base import BaseEstimator, clone
 from sklearn.multiclass import OneVsRestClassifier
 from sklearn.calibration import CalibratedClassifierCV
-from _utils_crfe import binary_change, NC_OvsA_SVMl_dev
-from _conformal_module import CP
+from ._utils_crfe import binary_change, NC_OvsA_SVMl_dev
+from ._conformal_module import CP
 
 
 

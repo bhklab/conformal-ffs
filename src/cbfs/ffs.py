@@ -24,10 +24,10 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.multiclass import OneVsRestClassifier
 from sklearn.calibration import CalibratedClassifierCV
 
-from _utils_crfe import DataReader, h5adDataReader
-from _crfe import CRFE
-from _MrmrMS import FeatureSelector
-from _utils import predict_scores_svm
+from ._utils_crfe import DataReader, h5adDataReader
+from ._crfe import CRFE
+from ._MrmrMS import FeatureSelector
+from ._utils import predict_scores_svm
 
 
 # Cache random number generator for efficiency

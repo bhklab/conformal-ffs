@@ -6,7 +6,7 @@ import pandas as pd
 import multiprocessing
 import sys
 
-from _utils_MrmrMS import beta_measures
+from ._utils_MrmrMS import beta_measures
 
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from scipy.special import digamma
