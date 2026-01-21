@@ -401,3 +401,10 @@ workflow/notebooks/results_analysis.ipynb
 workflow/notebooks/preproccesing.ipynb
 workflow/notebooks/README.md
 workflow/notebooks/example_notebook.ipynb
+
+__pycache__/
+dist/
+build/
+*.egg-info/
+
+src/__pycache__
